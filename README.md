@@ -62,5 +62,7 @@ object 7 at  242  197 has  3 sided symmetry and is likely not circular
 object 8 at  130  252 has  5 sided symmetry and is possibly circular
 ```
 
+## Dubious References
+
 1. "Radial frequency patterns describe a small and perceptually distinct subset of all possible planar shapes" https://www.sciencedirect.com/science/article/pii/S0042698918302219
 2. "The role of local features in shape discrimination of contour- and surface-defined radial frequency patterns at low contrast" https://www.sciencedirect.com/science/article/pii/S0042698911003555

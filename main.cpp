@@ -63,11 +63,6 @@ T Angle(const Point& from, const Point& to, const T q)
 
 struct BBox { int xmin, xmax, ymin, ymax; };
 
-float Area(const BBox& a)
-{
-    return float(a.xmax - a.xmin) * float(a.ymax - a.ymin);
-}
-
 void BoxSet(BBox& b, const Point& p)
 {
     b.xmin = b.xmax = p.x;
@@ -305,10 +300,8 @@ int wmain(int argc, wchar_t* argv[])
 
     // boxing and interior box removal
     std::vector<BBox> bx_limits;
-    std::vector<double> bx_areas;
     std::vector<Point> bx_centers;
     bx_limits.resize(id);
-    bx_areas.resize(id);
     bx_centers.resize(id);
     for(int i = 0; i < id; i++)
         if(clouds[i].size() > 0)
@@ -316,19 +309,17 @@ int wmain(int argc, wchar_t* argv[])
             BoxSet(bx_limits[i], clouds[i].at(0));
             for (Point p : clouds[i])
                 BoxEnlarge(bx_limits[i], p);
-            bx_areas[i] = Area(bx_limits[i]);
             BoxCenter(bx_centers[i], bx_limits[i]);
         }
     for (int i = 0; i < id; i++)
         for (int j = 0; j < id; j++)
             if( i != j )
-                if (bx_areas[i] > bx_areas[j] && bx_areas[j] > 0)
+                if (clouds[i].size() > 0 && clouds[j].size() > 0)
                     if (Distance<float>(bx_centers[i], bx_centers[j]) < tune_box_size_tol)
                     {
                         clouds[j].clear();
                         bx_centers[j] = Point({ 0,0 });
                         bx_limits[j] = BBox({ 0,0,0,0 });
-                        bx_areas[j] = 0;
                     }
 
     // circularity filter

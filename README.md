@@ -14,10 +14,9 @@ resemble a circle.
 
 2. Angular Power Sprectum - From the center of the bounding-box the point-cloud is
 split radially into a number of pie-segments and the points in each segment are
-counted and analyzed against points in adjacent segments. This is actually done using an FFT
-which actually gives a real frequency spectrum for the periodicity of the point
-counts in each segment. The goal here is to guess a geometric shape from the 
-radial point distribution frequency [1,2].
+counted and analyzed against points in adjacent segments and overall. This is actually done using an FFT
+which gives a radial frequency spectrum. The goal here is to guess a geometric shape from the
+radial frequencies [1,2].
 
 And now for some tests!
 

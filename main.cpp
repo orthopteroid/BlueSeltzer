@@ -363,7 +363,7 @@ int wmain(int argc, wchar_t* argv[])
             std::vector<double> angl_excursion;
             angl_excursion.resize(tune_circular_frequency_bins);
             for (Point p : clouds[i])
-                SelfMax<double>(angl_excursion.at(Angle(bx_centers[i], p, 31)), Distance<double>(p, bx_centers[i]));
+                SelfMax<double>(angl_excursion.at(Angle(bx_centers[i], p, tune_circular_frequency_bins-1)), Distance<double>(p, bx_centers[i]));
 
             std::vector<double> angl_excursion_factor;
             angl_excursion_factor.resize(tune_circular_frequency_bins);

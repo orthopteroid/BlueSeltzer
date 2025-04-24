@@ -354,8 +354,8 @@ int wmain(int argc, wchar_t* argv[])
         }
 
     // angular frequency / power filtering
-    std::vector< std::vector<double> > angl_power_deviation;
-    angl_power_deviation.resize(id);
+    std::vector< std::vector<double> > angl_power;
+    angl_power.resize(id);
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
@@ -363,27 +363,24 @@ int wmain(int argc, wchar_t* argv[])
             angl_count.resize(tune_circular_frequency_bins);
             for (Point p : clouds[i])
                 angl_count.at(Angle(bx_centers[i], p, tune_circular_frequency_bins-1)) += 1;
+
             std::vector<double> angl_norm_factor;
             angl_norm_factor.resize(tune_circular_frequency_bins);
             for (int j = 0; j < tune_circular_frequency_bins; j++)
                 angl_norm_factor.at(j) = angl_count.at(j) / clouds[i].size();
+
             std::vector<double> angl_excursion;
             angl_excursion.resize(tune_circular_frequency_bins);
             for (Point p : clouds[i])
                 SelfMax<double>(angl_excursion.at(Angle(bx_centers[i], p, 31)), Distance<double>(p, bx_centers[i]));
+
             std::vector<double> angl_excursion_factor;
             angl_excursion_factor.resize(tune_circular_frequency_bins);
             for (int j = 0; j < tune_circular_frequency_bins; j++)
                 angl_excursion_factor.at(j) = angl_norm_factor.at(j) * (angl_excursion.at(j) / circ_radius[i]);
-            std::vector<double> angl_power;
+
             angl_power.resize(tune_circular_frequency_bins);
-            NormalizedSpectrum(angl_power, angl_excursion_factor);
-            angl_power_deviation[i].resize(tune_circular_frequency_bins);
-            double power_avg = 0;
-            for (int j = 2; j < tune_circular_frequency_bins; j++) // nb start at 2 to skip VLF
-                power_avg += angl_power.at(j) / tune_circular_frequency_bins;
-            for (int j = 2; j < tune_circular_frequency_bins; j++) // nb start at 2 to skip VLF
-                angl_power_deviation[i].at(j) = angl_power.at(j) / power_avg;
+            NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 
     // print results
@@ -393,7 +390,7 @@ int wmain(int argc, wchar_t* argv[])
             int sides = 0;
             double side_max = 0;
             for (int j = 2; j < tune_circular_frequency_bins / 2; j++) // nb start at 2 to skip VLF, end at half the F
-                if (SelfMax<double>(side_max, angl_power_deviation[i].at(j))) sides = j;
+                if (SelfMax<double>(side_max, angl_power[i].at(j))) sides = j;
 
             const char* sz[] = { "very likely", "possibly", "likely not" };
             auto p = 1.0 - circ_stdev[i];

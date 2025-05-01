@@ -1,31 +1,42 @@
 ﻿// blueseltzer (c) 2025 orthopteroid@gmail.com
 // MIT license
 
+// platform headers
+#if defined(WIN32)
+
 #include <windows.h>
 #include <comdef.h>
 #include <combaseapi.h>
 #include <wincodec.h>
 #include <shlwapi.h>
 
-#define M_PI 3.14159265358979323846 
+#elif defined(UNIX)
+
+#endif // platform headers
+
+///////////////////
 
 #include <iostream>
 #include <vector>
 #include <complex>
 
+#ifndef M_PI
+#define M_PI  3.14159265358979323846
+#endif
+
 using namespace std;
 
 struct Surface
 {
-    UINT width, height;
-    BYTE* data;
+    uint32_t width, height;
+    uint8_t* data;
 
     Surface()
     {
         width = height = 0;
         data = NULL;
     }
-    Surface(const UINT w, const UINT h)
+    Surface(const uint32_t w, const uint32_t h)
     {
         width = w; height = h;
         data = NULL;
@@ -35,9 +46,9 @@ struct Surface
         if (data) free(data);
     }
 
-    void Open()
+    void Malloc()
     {
-        data = (BYTE*)malloc(width * height);
+        data = (uint8_t*)malloc(width * height);
         if (data)
             memset(data, 0, width * height);
     }
@@ -128,8 +139,12 @@ boolean SelfMax(T& m, const T& v)
 
 //////////////////////////
 
-struct Win32
+// platform implementation
+#if defined(WIN32)
+
+struct Image
 {
+    const wchar_t* wzFilename;
     const char* szContext;
     HRESULT hr;
     IWICImagingFactory* pIWICFactory;
@@ -137,8 +152,9 @@ struct Win32
     IWICBitmapFrameDecode* pIFrame;
     IWICFormatConverter* pIConverter;
 
-    Win32()
+    Image()
     {
+        wzFilename = NULL;
         szContext = NULL;
         hr = S_OK;
         pIWICFactory = NULL;
@@ -146,7 +162,7 @@ struct Win32
         pIFrame = NULL;
         pIConverter = NULL;
     }
-    virtual ~Win32()
+    virtual ~Image()
     {
         if (pIFrame) pIFrame->Release();
         if (pIConverter) pIConverter->Release();
@@ -154,8 +170,13 @@ struct Win32
         if (pIWICFactory) pIWICFactory->Release();
         CoUninitialize();
     }
+    
+    void SetFile(const wchar_t* wz)
+    {
+        wzFilename = wz;
+    }
 
-    void Open(const wchar_t* wzFilename)
+    void Open()
     {
         szContext = "CoInitializeEx";
         hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -215,7 +236,7 @@ struct Win32
         if (FAILED(hr)) goto err;
 
         szContext = "malloc";
-        s.Open();
+        s.Malloc();
         if (!s.data) goto err;
 
         szContext = "CreateFormatConverter::CopyPixels";
@@ -230,10 +251,27 @@ struct Win32
     }
 };
 
+void app(Image& image); // fwd declaration
+
+// win32 console app
 int wmain(int argc, wchar_t* argv[])
 {
-    Win32 image;
-    image.Open(argv[1]);
+    Image image;
+    image.SetFile(argv[1]);
+    app(image);
+    return 0;
+}
+
+#elif defined(UNIX)
+
+#endif // platform implementation
+
+////////////////////////////
+// platform independent code
+
+void app(Image& image)
+{
+    image.Open();
 
     Surface surf;
     image.GetData(surf);
@@ -250,7 +288,7 @@ int wmain(int argc, wchar_t* argv[])
 
     // edge/contrast/adjacency filter
     Surface edge(surf.width, surf.height);
-    edge.Open();
+    edge.Malloc();
     for (UINT y = 1; y < surf.height -1; y++)
         for (UINT x = 1; x < surf.width - 1; x++)
         {
@@ -269,7 +307,7 @@ int wmain(int argc, wchar_t* argv[])
     // point numbering filter
     uint8_t id = 1; // 0 unused
     Surface numb(edge.width, edge.height);
-    numb.Open();
+    numb.Malloc();
     for (UINT y = 1; y < edge.height -1; y++)
         for (UINT x = tune_pixel_filter_tol; x < edge.width - 2; x++)
             if(edge.At(x,y) && !numb.At(x,y))
@@ -391,6 +429,4 @@ int wmain(int argc, wchar_t* argv[])
                 i, bx_centers[i].x, bx_centers[i].y, sides, sz[ p > .9 ? 0 : (p > .8 ? 1 : 2) ]
             );
         }
-
-    return 0;
 }

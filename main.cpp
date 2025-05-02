@@ -2,6 +2,7 @@
 // MIT license
 
 // platform headers
+// a little crazy to have here, but it seems MSDEV puts some platforms types into the std headers
 #if defined(WIN32)
 
 #include <windows.h>
@@ -10,7 +11,7 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 
-#elif defined(UNIX)
+#elif defined(LINUX)
 
 #endif // platform headers
 
@@ -39,18 +40,19 @@ struct Surface
     Surface(const uint32_t w, const uint32_t h)
     {
         width = w; height = h;
-        data = NULL;
+        data = new uint8_t[width * height](0);
+    }
+    void Realloc(const uint32_t w, const uint32_t h)
+    {
+        if (data)
+            delete[] data;
+        width = w; height = h;
+        data = new uint8_t[width * height](0);
     }
     virtual ~Surface()
     {
-        if (data) free(data);
-    }
-
-    void Malloc()
-    {
-        data = (uint8_t*)malloc(width * height);
         if (data)
-            memset(data, 0, width * height);
+            delete[] data;
     }
 
     inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }
@@ -131,7 +133,7 @@ void NormalizedSpectrum(std::vector<T>& s, const std::vector<T>& v)
 
 // with maxing trigger
 template< class T >
-boolean SelfMax(T& m, const T& v)
+bool SelfMax(T& m, const T& v)
 {
     if(v > m) { m = v; return true;}
     return false;
@@ -176,7 +178,7 @@ struct Image
         wzFilename = wz;
     }
 
-    void Open()
+    void Load()
     {
         szContext = "CoInitializeEx";
         hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -229,21 +231,22 @@ struct Image
         exit(1);
     }
 
-    void GetData(Surface& s)
+    Surface GetData()
     {
+        Surface s;
+        uint32_t w, h;
+
         szContext = "CreateFormatConverter::GetSize";
-        hr = pIConverter->GetSize(&s.width, &s.height);
+        hr = pIConverter->GetSize(&w, &h);
         if (FAILED(hr)) goto err;
 
-        szContext = "malloc";
-        s.Malloc();
-        if (!s.data) goto err;
+        s.Realloc(w,h);
 
         szContext = "CreateFormatConverter::CopyPixels";
         hr = pIConverter->CopyPixels(NULL, s.width, s.width * s.height, s.data);
         if (FAILED(hr)) goto err;
 
-        return;
+        return s;
     err:
         _com_error err(hr);
         cout << "(win32) " << szContext << ": " << err.ErrorMessage() << endl;
@@ -262,7 +265,100 @@ int wmain(int argc, wchar_t* argv[])
     return 0;
 }
 
-#elif defined(UNIX)
+#elif defined(LINUX)
+
+#include <jpeglib.h>
+#include <jerror.h>
+#include <memory.h>
+#include <setjmp.h>
+
+// https://www.tspi.at/2020/03/20/libjpegexample.html#gsc.tab=0
+struct Image
+{
+    struct jpeg_decompress_struct info;
+    struct jpeg_error_mgr err;
+
+    const char* szContext;
+    uint8_t* pData;
+
+    char* lpFilename;
+
+    Image()
+    {
+        szContext = 0;
+        pData = 0;
+    }
+    virtual ~Image()
+    {
+        if (pData)
+            delete[] pData;
+    }
+
+    void SetFile(char* sz)
+    {
+        lpFilename = sz;
+    }
+
+    void Load()
+    {
+        FILE* fHandle = NULL;
+        uint8_t* pBuffer = 0;
+
+        szContext = "fopen";
+        fHandle = fopen(lpFilename, "rb");
+        if (fHandle == NULL) goto err;
+
+        info.err = jpeg_std_error(&err);
+        jpeg_create_decompress(&info);
+
+        jpeg_stdio_src(&info, fHandle);
+        jpeg_read_header(&info, TRUE);
+
+        jpeg_start_decompress(&info);
+
+        pData = new uint8_t[info.output_width * info.output_height];
+        pBuffer = new uint8_t[info.output_width * info.num_components];
+
+        while (info.output_scanline < info.output_height)
+        {
+            uint8_t* ppBuffer[1];
+            ppBuffer[0] = pBuffer;
+            szContext = "jpeg_read_scanlines";
+            JDIMENSION n = jpeg_read_scanlines(&info, ppBuffer, 1);
+            if (n!=1) goto err;
+            for(int i=0; i<info.output_width; i++)
+                pData[info.output_width * (info.output_scanline-1) + i] =
+                    (uint8_t)(0.299f * (float)pBuffer[i*3+0] + 0.587f * (float)pBuffer[i*3+1] + 0.114f * (float)pBuffer[i*3+2]);
+        }
+
+        jpeg_finish_decompress(&info);
+        jpeg_destroy_decompress(&info);
+        fclose(fHandle);
+        delete[] pBuffer;
+        return;
+
+    err:
+        cout << "(linux) " << szContext << endl;
+        exit(-1);
+    }
+
+    Surface GetData()
+    {
+        Surface s(info.output_width, info.output_height);
+        memcpy(s.data, pData, s.width * s.height);
+        return s;
+    }
+};
+
+void app(Image& image); // fwd declaration
+
+int main(int argc, char* argv[])
+{
+    Image image;
+    image.SetFile(argv[1]);
+    app(image);
+    return 0;
+}
 
 #endif // platform implementation
 
@@ -271,10 +367,9 @@ int wmain(int argc, wchar_t* argv[])
 
 void app(Image& image)
 {
-    image.Open();
+    image.Load();
 
-    Surface surf;
-    image.GetData(surf);
+    Surface surf = image.GetData();
 
     cout << "image width " << surf.width << " height " << surf.height << endl;
 
@@ -288,9 +383,8 @@ void app(Image& image)
 
     // edge/contrast/adjacency filter
     Surface edge(surf.width, surf.height);
-    edge.Malloc();
-    for (UINT y = 1; y < surf.height -1; y++)
-        for (UINT x = 1; x < surf.width - 1; x++)
+    for (uint16_t y = 1; y < surf.height -1; y++)
+        for (uint16_t x = 1; x < surf.width - 1; x++)
         {
             int weight = 0;
             weight += surf.At(x - 1, y -1) < tune_black_tol ? 1 : 0;
@@ -307,9 +401,8 @@ void app(Image& image)
     // point numbering filter
     uint8_t id = 1; // 0 unused
     Surface numb(edge.width, edge.height);
-    numb.Malloc();
-    for (UINT y = 1; y < edge.height -1; y++)
-        for (UINT x = tune_pixel_filter_tol; x < edge.width - 2; x++)
+    for (uint16_t y = 1; y < edge.height -1; y++)
+        for (uint16_t x = tune_pixel_filter_tol; x < edge.width - 2; x++)
             if(edge.At(x,y) && !numb.At(x,y))
             {
                 uint8_t cat = 0;
@@ -333,7 +426,7 @@ void app(Image& image)
     for (int i = 0; i < id; i++)
         maxcount = max(maxcount,clouds[i].size());
     for (int i = 0; i < id; i++)
-        if(clouds[i].size() < max(10, maxcount / tune_cloud_filter_factor))
+        if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
             clouds[i].clear();
 
     // boxing and interior box removal

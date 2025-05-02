@@ -463,7 +463,7 @@ void app(Image& image)
             }
 
     // small cloud filtering
-    std::vector< std::vector<point_t> > clouds;
+    std::vector< std::vector<Point> > clouds;
     clouds.resize(id);
     for (uint16_t y = 0; y < numb.height; y++)
         for (uint16_t x = 0; x < numb.width; x++)

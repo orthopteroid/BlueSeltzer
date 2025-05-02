@@ -33,25 +33,39 @@
 
 using namespace std;
 
-struct Surface
+///////////////////
+// basic types
+
+struct surf_t
 {
     uint32_t width, height;
     uint8_t* data;
+};
 
+struct point_t {
+    int x, y;
+};
+
+struct bbox_t {
+    int xmin, xmax, ymin, ymax;
+};
+
+///////////////////
+// wrappers for basic types
+
+struct Surface: public surf_t
+{
     Surface()
     {
         width = height = 0;
         data = NULL;
     }
+    Surface(const surf_t& s)
+    {
+        width = s.width; height = s.height; data = s.data;
+    }
     Surface(const uint32_t w, const uint32_t h)
     {
-        width = w; height = h;
-        data = new uint8_t[width * height](0);
-    }
-    void Realloc(const uint32_t w, const uint32_t h)
-    {
-        if (data)
-            delete[] data;
         width = w; height = h;
         data = new uint8_t[width * height](0);
     }
@@ -59,48 +73,75 @@ struct Surface
     {
         if (data)
             delete[] data;
+        data = 0;
+    }
+
+    void Realloc(const uint32_t w, const uint32_t h)
+    {
+        if (data)
+            delete[] data;
+        width = w; height = h;
+        data = new uint8_t[width * height](0);
     }
 
     inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }
 };
 
-struct Point { int x, y; };
-
-template< class T >
-T Distance(const Point& a, const Point& b)
+struct Point : public point_t
 {
-    return sqrt(T(a.x - b.x) * T(a.x - b.x) + T(a.y - b.y) * T(a.y - b.y));
-}
+    Point() {}
+    Point(const int _x, const int _y)
+    {
+        x = _x; y = _y;
+    }
+    Point(const point_t& p)
+    {
+        x = p.x; y = p.y;
+    }
+    virtual ~Point() {}
 
-// 0..1, 0 is up
-template< class T >
-T Angle(const Point& from, const Point& to, const T q)
+    template< class T >
+    T Distance(const point_t& to)
+    {
+        return sqrt(T(to.x - x) * T(to.x - x) + T(to.y - y) * T(to.y - y));
+    }
+
+    // 0 is up, quantized by q
+    template< class T >
+    T Angle(const point_t& to, const T q)
+    {
+        auto fa = (atan2(to.y - y, to.x - x) + M_PI) / M_PI / 2;
+        return T(fa * q);
+    }
+};
+
+struct BBox: public bbox_t
 {
-    auto fa = (atan2(to.y - from.y, to.x - from.x) + M_PI) / M_PI / 2;
-    return T(fa * q);
-}
+    BBox() { xmin=xmax=ymin=ymax=0; }
+    BBox(const int xn, const int xm, const int yn, const int ym)
+    { xmin=xn; xmax=xm; ymin=yn; ymax=ym; }
+    virtual ~BBox() {}
 
-struct BBox { int xmin, xmax, ymin, ymax; };
+    void Set(const point_t& p)
+    {
+        xmin = xmax = p.x;
+        ymin = ymax = p.y;
+    }
 
-void BoxSet(BBox& b, const Point& p)
-{
-    b.xmin = b.xmax = p.x;
-    b.ymin = b.ymax = p.y;
-}
+    void Enlarge(const point_t& p)
+    {
+        xmin = min(xmin, p.x);
+        xmax = max(xmax, p.x);
+        ymin = min(ymin, p.y);
+        ymax = max(ymax, p.y);
+    }
 
-void BoxEnlarge(BBox& b, const Point& p)
-{
-    b.xmin = min(b.xmin, p.x);
-    b.xmax = max(b.xmax, p.x);
-    b.ymin = min(b.ymin, p.y);
-    b.ymax = max(b.ymax, p.y);
-}
+    point_t GetCenter()
+    {
+        return {(xmin + xmax) / 2, (ymin + ymax) / 2};
+    }
 
-void BoxCenter(Point& p, const BBox& b)
-{
-    p.x = (b.xmin + b.xmax) / 2;
-    p.y = (b.ymin + b.ymax) / 2;
-}
+};
 
 // https://cppscripts.com/fft-cpp-code
 template< class T >
@@ -421,12 +462,12 @@ void app(Image& image)
             }
 
     // small cloud filtering
-    std::vector< std::vector<Point> > clouds;
+    std::vector< std::vector<point_t> > clouds;
     clouds.resize(id);
     for (uint16_t y = 0; y < numb.height; y++)
         for (uint16_t x = 0; x < numb.width; x++)
             if(numb.At(x, y))
-                clouds[numb.At(x, y)].emplace_back(Point({x,y}));
+                clouds[numb.At(x, y)].emplace_back(point_t({x,y}));
     size_t maxcount = 0;
     for (int i = 0; i < id; i++)
         maxcount = max(maxcount,clouds[i].size());
@@ -442,20 +483,20 @@ void app(Image& image)
     for(int i = 0; i < id; i++)
         if(clouds[i].size() > 0)
         {
-            BoxSet(bx_limits[i], clouds[i].at(0));
-            for (Point p : clouds[i])
-                BoxEnlarge(bx_limits[i], p);
-            BoxCenter(bx_centers[i], bx_limits[i]);
+            bx_limits[i].Set(clouds[i].at(0));
+            for (point_t p : clouds[i])
+                bx_limits[i].Enlarge(p);
+            bx_centers[i] = Point(bx_limits[i].GetCenter());
         }
     for (int i = 0; i < id; i++)
         for (int j = 0; j < id; j++)
             if( i != j )
                 if (clouds[i].size() > 0 && clouds[j].size() > 0)
-                    if (Distance<float>(bx_centers[i], bx_centers[j]) < tune_box_size_tol)
+                    if (bx_centers[i].Distance<float>(bx_centers[j]) < tune_box_size_tol)
                     {
                         clouds[j].clear();
-                        bx_centers[j] = Point({ 0,0 });
-                        bx_limits[j] = BBox({ 0,0,0,0 });
+                        bx_centers[j] = { 0,0 };
+                        bx_limits[j] = { 0,0,0,0 };
                     }
 
     // circularity filter
@@ -466,7 +507,7 @@ void app(Image& image)
         {
             circ_radius[i] = 0;
             for (Point p : clouds[i])
-                circ_radius[i] += Distance<double>(p, bx_centers[i]);
+                circ_radius[i] += p.Distance<double>(bx_centers[i]);
             circ_radius[i] /= clouds[i].size();
         }
     std::vector<double> circ_stdev;
@@ -476,7 +517,7 @@ void app(Image& image)
         {
             circ_stdev[i] = 0;
             for (Point p : clouds[i])
-                circ_stdev[i] += pow(circ_radius[i] - Distance<double>(p, bx_centers[i]), 2);
+                circ_stdev[i] += pow(circ_radius[i] - p.Distance<double>(bx_centers[i]), 2);
             circ_stdev[i] = pow(circ_stdev[i], 0.5) / clouds[i].size();
         }
 
@@ -488,8 +529,8 @@ void app(Image& image)
         {
             std::vector<double> angl_count;
             angl_count.resize(tune_circular_frequency_bins);
-            for (Point p : clouds[i])
-                angl_count.at(Angle(bx_centers[i], p, tune_circular_frequency_bins-1)) += 1;
+            for (point_t p : clouds[i])
+                angl_count.at(bx_centers[i].Angle(p, tune_circular_frequency_bins-1)) += 1;
 
             std::vector<double> angl_norm_factor;
             angl_norm_factor.resize(tune_circular_frequency_bins);
@@ -499,7 +540,7 @@ void app(Image& image)
             std::vector<double> angl_excursion;
             angl_excursion.resize(tune_circular_frequency_bins);
             for (Point p : clouds[i])
-                SelfMax<double>(angl_excursion.at(Angle(bx_centers[i], p, tune_circular_frequency_bins-1)), Distance<double>(p, bx_centers[i]));
+                SelfMax<double>(angl_excursion.at(bx_centers[i].Angle(p, tune_circular_frequency_bins-1)), p.Distance<double>(bx_centers[i]));
 
             std::vector<double> angl_excursion_factor;
             angl_excursion_factor.resize(tune_circular_frequency_bins);

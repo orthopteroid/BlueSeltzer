@@ -276,17 +276,13 @@ int wmain(int argc, wchar_t* argv[])
 // https://www.tspi.at/2020/03/20/libjpegexample.html#gsc.tab=0
 struct Image
 {
+    char* lpFilename;
     struct jpeg_decompress_struct info;
     struct jpeg_error_mgr err;
-
-    const char* szContext;
     uint8_t* pData;
-
-    char* lpFilename;
 
     Image()
     {
-        szContext = 0;
         pData = 0;
     }
     virtual ~Image()
@@ -302,20 +298,25 @@ struct Image
 
     void Load()
     {
+        const char* szContext = "";
         FILE* fHandle = NULL;
         uint8_t* pBuffer = 0;
 
         szContext = "fopen";
-        fHandle = fopen(lpFilename, "rb");
-        if (fHandle == NULL) goto err;
+        if ((fHandle = fopen(lpFilename, "rb")) == NULL) goto err;
 
         info.err = jpeg_std_error(&err);
         jpeg_create_decompress(&info);
-
         jpeg_stdio_src(&info, fHandle);
-        jpeg_read_header(&info, TRUE);
 
-        jpeg_start_decompress(&info);
+        szContext = "jpeg_read_header";
+        if(jpeg_read_header(&info, TRUE) == 0) goto err;
+
+        szContext = "jpeg_start_decompress";
+        if (jpeg_start_decompress(&info) == false) goto err;
+
+        szContext = "info.num_components != 3";
+        if(info.num_components != 3) goto err;
 
         pData = new uint8_t[info.output_width * info.output_height];
         pBuffer = new uint8_t[info.output_width * info.num_components];
@@ -332,14 +333,16 @@ struct Image
                     (uint8_t)(0.299f * (float)pBuffer[i*3+0] + 0.587f * (float)pBuffer[i*3+1] + 0.114f * (float)pBuffer[i*3+2]);
         }
 
-        jpeg_finish_decompress(&info);
+        szContext = "jpeg_finish_decompress";
+        if (jpeg_finish_decompress(&info) == false) goto err;
+
         jpeg_destroy_decompress(&info);
         fclose(fHandle);
         delete[] pBuffer;
         return;
 
     err:
-        cout << "(linux) " << szContext << endl;
+        cout << "(linux) error during: " << szContext << endl;
         exit(-1);
     }
 

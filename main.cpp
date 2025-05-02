@@ -13,6 +13,12 @@
 
 #elif defined(LINUX)
 
+#include <stdio.h>
+#include <memory.h>
+#include <setjmp.h>
+#include <jpeglib.h>
+#include <jerror.h>
+
 #endif // platform headers
 
 ///////////////////
@@ -267,11 +273,6 @@ int wmain(int argc, wchar_t* argv[])
 }
 
 #elif defined(LINUX)
-
-#include <jpeglib.h>
-#include <jerror.h>
-#include <memory.h>
-#include <setjmp.h>
 
 // https://www.tspi.at/2020/03/20/libjpegexample.html#gsc.tab=0
 struct Image

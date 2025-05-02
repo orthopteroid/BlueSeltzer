@@ -147,7 +147,6 @@ bool SelfMax(T& m, const T& v)
 struct Image
 {
     const wchar_t* wzFilename;
-    const char* szContext;
     HRESULT hr;
     IWICImagingFactory* pIWICFactory;
     IWICBitmapDecoder* pIDecoder;
@@ -157,7 +156,6 @@ struct Image
     Image()
     {
         wzFilename = NULL;
-        szContext = NULL;
         hr = S_OK;
         pIWICFactory = NULL;
         pIDecoder = NULL;
@@ -180,6 +178,8 @@ struct Image
 
     void Load()
     {
+        const char* szContext = NULL;
+
         szContext = "CoInitializeEx";
         hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
         if (FAILED(hr)) goto err;
@@ -235,6 +235,7 @@ struct Image
     {
         Surface s;
         uint32_t w, h;
+        const char* szContext = NULL;
 
         szContext = "CreateFormatConverter::GetSize";
         hr = pIConverter->GetSize(&w, &h);

@@ -23,6 +23,7 @@
 
 ///////////////////
 
+#include <memory>
 #include <iostream>
 #include <vector>
 #include <complex>
@@ -278,23 +279,24 @@ struct Image
         exit(1);
     }
 
-    Surface GetData()
+    shared_ptr<Surface> GetSurface()
     {
-        Surface s;
         uint32_t w, h;
         const char* szContext = NULL;
+
+        auto Surf = make_shared<Surface>();
 
         szContext = "CreateFormatConverter::GetSize";
         hr = pIConverter->GetSize(&w, &h);
         if (FAILED(hr)) goto err;
 
-        s.Realloc(w,h);
+        Surf.get()->Realloc(w,h);
 
         szContext = "CreateFormatConverter::CopyPixels";
-        hr = pIConverter->CopyPixels(NULL, s.width, s.width * s.height, s.data);
+        hr = pIConverter->CopyPixels(NULL, Surf.get()->width, Surf.get()->width * Surf.get()->height, Surf.get()->data);
         if (FAILED(hr)) goto err;
 
-        return s;
+        return Surf;
     err:
         _com_error err(hr);
         cout << "(win32) " << szContext << ": " << err.ErrorMessage() << endl;
@@ -319,18 +321,14 @@ int wmain(int argc, wchar_t* argv[])
 struct Image
 {
     char* lpFilename;
-    struct jpeg_decompress_struct info;
-    struct jpeg_error_mgr err;
-    uint8_t* pData;
+    shared_ptr<Surface> Surf;
 
     Image()
     {
-        pData = 0;
+        Surf = std::make_shared<Surface>();
     }
     virtual ~Image()
     {
-        if (pData)
-            delete[] pData;
     }
 
     void SetFile(char* sz)
@@ -343,6 +341,9 @@ struct Image
         const char* szContext = "";
         FILE* fHandle = NULL;
         uint8_t* pBuffer = 0;
+
+        struct jpeg_decompress_struct info;
+        struct jpeg_error_mgr err;
 
         szContext = "fopen";
         if ((fHandle = fopen(lpFilename, "rb")) == NULL) goto err;
@@ -360,7 +361,9 @@ struct Image
         szContext = "info.num_components != 3";
         if(info.num_components != 3) goto err;
 
-        pData = new uint8_t[info.output_width * info.output_height];
+        Surf.get()->width = info.output_width;
+        Surf.get()->height=info.output_height;
+        Surf.get()->data = new uint8_t[info.output_width * info.output_height];
         pBuffer = new uint8_t[info.output_width * info.num_components];
 
         while (info.output_scanline < info.output_height)
@@ -371,7 +374,7 @@ struct Image
             JDIMENSION n = jpeg_read_scanlines(&info, ppBuffer, 1);
             if (n!=1) goto err;
             for(int i=0; i<info.output_width; i++)
-                pData[info.output_width * (info.output_scanline-1) + i] =
+                Surf.get()->data[info.output_width * (info.output_scanline-1) + i] =
                     (uint8_t)(0.299f * (float)pBuffer[i*3+0] + 0.587f * (float)pBuffer[i*3+1] + 0.114f * (float)pBuffer[i*3+2]);
         }
 
@@ -388,11 +391,9 @@ struct Image
         exit(-1);
     }
 
-    Surface GetData()
+    shared_ptr<Surface> GetSurface()
     {
-        Surface s(info.output_width, info.output_height);
-        memcpy(s.data, pData, s.width * s.height);
-        return s;
+        return Surf;
     }
 };
 
@@ -415,9 +416,9 @@ void app(Image& image)
 {
     image.Load();
 
-    Surface surf = image.GetData();
+    shared_ptr<Surface> Surf = image.GetSurface();
 
-    cout << "image width " << surf.width << " height " << surf.height << endl;
+    cout << "image width " << Surf.get()->width << " height " << Surf.get()->height << endl;
 
     // different classifications might be found by tweaking the tunings
     uint8_t tune_black_tol = 128;
@@ -428,19 +429,19 @@ void app(Image& image)
     uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
 
     // edge/contrast/adjacency filter
-    Surface edge(surf.width, surf.height);
-    for (uint16_t y = 1; y < surf.height -1; y++)
-        for (uint16_t x = 1; x < surf.width - 1; x++)
+    Surface edge(Surf.get()->width, Surf.get()->height);
+    for (uint16_t y = 1; y < Surf.get()->height -1; y++)
+        for (uint16_t x = 1; x < Surf.get()->width - 1; x++)
         {
             int weight = 0;
-            weight += surf.At(x - 1, y -1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x + 0, y -1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x + 1, y -1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x - 1, y +1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x + 0, y +1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x + 1, y +1) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x - 1, y +0) < tune_black_tol ? 1 : 0;
-            weight += surf.At(x + 1, y +0) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x - 1, y -1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x + 0, y -1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x + 1, y -1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x - 1, y +1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x + 0, y +1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x + 1, y +1) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x - 1, y +0) < tune_black_tol ? 1 : 0;
+            weight += Surf.get()->At(x + 1, y +0) < tune_black_tol ? 1 : 0;
             edge.At(x, y) = weight > tune_adjacency_tol ? 0xFF : 0x00;
         }
 

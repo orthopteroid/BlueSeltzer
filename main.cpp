@@ -87,6 +87,20 @@ struct Image
         wzFilename = wz;
     }
 
+    // https://gist.github.com/xebecnan/6d070c93fb69f40c3673
+    std::string GetFile()
+    {
+        if (!wzFilename) return std::string();
+        size_t wclen = wcslen(wzFilename);
+        size_t mblen = WideCharToMultiByte(CP_UTF8, 0, wzFilename, wclen, 0, 0, NULL, NULL);
+        char* buff = new char[mblen + 1];
+        WideCharToMultiByte(CP_UTF8, 0, wzFilename, wclen, buff, mblen, NULL, NULL);
+        buff[mblen] = '\0';
+        std::string str(buff);
+        delete []buff;
+        return str;
+    }
+
     void Load()
     {
         const char* szContext = NULL;
@@ -181,7 +195,7 @@ int wmain(int argc, wchar_t* argv[])
 // https://www.tspi.at/2020/03/20/libjpegexample.html#gsc.tab=0
 struct Image
 {
-    char* lpFilename;
+    char* szFilename;
     surf_t surf;
 
     Image()
@@ -193,7 +207,12 @@ struct Image
 
     void SetFile(char* sz)
     {
-        lpFilename = sz;
+        szFilename = sz;
+    }
+
+    std::string GetFile()
+    {
+        return std::string(szFilename);
     }
 
     void Load()
@@ -206,7 +225,7 @@ struct Image
         struct jpeg_error_mgr err;
 
         szContext = "fopen";
-        if ((fHandle = fopen(lpFilename, "rb")) == NULL) goto err;
+        if ((fHandle = fopen(szFilename, "rb")) == NULL) goto err;
 
         info.err = jpeg_std_error(&err);
         jpeg_create_decompress(&info);
@@ -405,7 +424,7 @@ void app(Image& image)
 
     auto Surf = image.GetSurface();
 
-    cout << "image width " << Surf.get()->width << " height " << Surf.get()->height << endl;
+    cout << image.GetFile() << " width " << Surf.get()->width << " height " << Surf.get()->height << endl;
 
     // different classifications might be found by tweaking the tunings
     uint8_t tune_black_tol = 128;

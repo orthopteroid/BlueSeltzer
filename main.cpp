@@ -1,8 +1,9 @@
 ﻿// blueseltzer (c) 2025 orthopteroid@gmail.com
 // MIT license
 
+///////////////////
 // platform headers
-// a little crazy to have here, but it seems MSDEV puts some platforms types into the std headers
+
 #if defined(WIN32)
 
 #include <windows.h>
@@ -10,6 +11,11 @@
 #include <combaseapi.h>
 #include <wincodec.h>
 #include <shlwapi.h>
+
+#include <memory>
+#include <iostream>
+#include <vector>
+#include <complex>
 
 #elif defined(LINUX)
 
@@ -19,20 +25,12 @@
 #include <jpeglib.h>
 #include <jerror.h>
 
-#endif // platform headers
-
-///////////////////
-
 #include <memory>
 #include <iostream>
 #include <vector>
 #include <complex>
 
-#ifndef M_PI
-#define M_PI  3.14159265358979323846
-#endif
-
-using namespace std;
+#endif // platform headers
 
 ///////////////////
 // basic types
@@ -51,145 +49,17 @@ struct bbox_t {
     int xmin, xmax, ymin, ymax;
 };
 
+struct Surface;
+
 ///////////////////
-// wrappers for basic types
+// platform dependent stuff
 
-struct Surface: public surf_t
-{
-    Surface()
-    {
-        width = height = 0;
-        data = NULL;
-    }
-    Surface(const surf_t& s)
-    {
-        width = s.width; height = s.height; data = s.data;
-    }
-    Surface(const uint32_t w, const uint32_t h)
-    {
-        width = w; height = h;
-        data = new uint8_t[width * height](0);
-    }
-    virtual ~Surface()
-    {
-        if (data)
-            delete[] data;
-        data = 0;
-    }
+#ifndef M_PI
+#define M_PI  3.14159265358979323846
+#endif
 
-    void Realloc(const uint32_t w, const uint32_t h)
-    {
-        if (data)
-            delete[] data;
-        width = w; height = h;
-        data = new uint8_t[width * height](0);
-    }
+using namespace std;
 
-    inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }
-};
-
-struct Point : public point_t
-{
-    Point() {}
-    Point(const int _x, const int _y)
-    {
-        x = _x; y = _y;
-    }
-    Point(const point_t& p)
-    {
-        x = p.x; y = p.y;
-    }
-    virtual ~Point() {}
-
-    template< class T >
-    T Distance(const point_t& to)
-    {
-        return sqrt(T(to.x - x) * T(to.x - x) + T(to.y - y) * T(to.y - y));
-    }
-
-    // 0 is up, quantized by q
-    template< class T >
-    T Angle(const point_t& to, const T q)
-    {
-        auto fa = (atan2(to.y - y, to.x - x) + M_PI) / M_PI / 2;
-        return T(fa * q);
-    }
-};
-
-struct BBox: public bbox_t
-{
-    BBox() { xmin=xmax=ymin=ymax=0; }
-    BBox(const int xn, const int xm, const int yn, const int ym)
-    { xmin=xn; xmax=xm; ymin=yn; ymax=ym; }
-    virtual ~BBox() {}
-
-    void Set(const point_t& p)
-    {
-        xmin = xmax = p.x;
-        ymin = ymax = p.y;
-    }
-
-    void Enlarge(const point_t& p)
-    {
-        xmin = min(xmin, p.x);
-        xmax = max(xmax, p.x);
-        ymin = min(ymin, p.y);
-        ymax = max(ymax, p.y);
-    }
-
-    point_t GetCenter()
-    {
-        return {(xmin + xmax) / 2, (ymin + ymax) / 2};
-    }
-
-};
-
-// https://cppscripts.com/fft-cpp-code
-template< class T >
-void fft(vector<complex<T>>& x)
-{
-    size_t N = x.size();
-    if (N <= 1) return;
-
-    vector<complex<T>> even(N / 2), odd(N / 2);
-    for (int i = 0; i < N / 2; ++i) {
-        even[i] = x[i * 2];
-        odd[i] = x[i * 2 + 1];
-    }
-
-    fft(even);
-    fft(odd);
-
-    for (int k = 0; k < N / 2; ++k) {
-        complex<T> t = polar(1.0, -2 * M_PI * k / N) * odd[k];
-        x[k] = even[k] + t;
-        x[k + N / 2] = even[k] - t;
-    }
-}
-
-template< class T >
-void NormalizedSpectrum(std::vector<T>& s, const std::vector<T>& v)
-{
-    vector<complex<T>> x;
-    for(auto p: v)
-        x.push_back(p);
-    fft(x);
-    s.clear();
-    for (auto p : x)
-        s.push_back(norm(p));
-}
-
-// with maxing trigger
-template< class T >
-bool SelfMax(T& m, const T& v)
-{
-    if(v > m) { m = v; return true;}
-    return false;
-}
-
-//////////////////////////
-
-// platform implementation
 #if defined(WIN32)
 
 struct Image
@@ -279,24 +149,22 @@ struct Image
         exit(1);
     }
 
-    shared_ptr<Surface> GetSurface()
+    unique_ptr<Surface> GetSurface()
     {
-        uint32_t w, h;
         const char* szContext = NULL;
-
-        auto Surf = make_shared<Surface>();
+        surf_t surf;
 
         szContext = "CreateFormatConverter::GetSize";
-        hr = pIConverter->GetSize(&w, &h);
+        hr = pIConverter->GetSize(&surf.width, &surf.height);
         if (FAILED(hr)) goto err;
 
-        Surf.get()->Realloc(w,h);
+        surf.data = new uint8_t[surf.width * surf.height](0);
 
         szContext = "CreateFormatConverter::CopyPixels";
-        hr = pIConverter->CopyPixels(NULL, Surf.get()->width, Surf.get()->width * Surf.get()->height, Surf.get()->data);
+        hr = pIConverter->CopyPixels(NULL, surf.width, surf.width * surf.height, surf.data);
         if (FAILED(hr)) goto err;
 
-        return Surf;
+        return make_unique<Surface>(surf);
     err:
         _com_error err(hr);
         cout << "(win32) " << szContext << ": " << err.ErrorMessage() << endl;
@@ -321,11 +189,10 @@ int wmain(int argc, wchar_t* argv[])
 struct Image
 {
     char* lpFilename;
-    shared_ptr<Surface> Surf;
+    surf_t surf;
 
     Image()
     {
-        Surf = std::make_shared<Surface>();
     }
     virtual ~Image()
     {
@@ -361,9 +228,9 @@ struct Image
         szContext = "info.num_components != 3";
         if(info.num_components != 3) goto err;
 
-        Surf.get()->width = info.output_width;
-        Surf.get()->height=info.output_height;
-        Surf.get()->data = new uint8_t[info.output_width * info.output_height];
+        surf.width = info.output_width;
+        surf.height=info.output_height;
+        surf.data = new uint8_t[info.output_width * info.output_height];
         pBuffer = new uint8_t[info.output_width * info.num_components];
 
         while (info.output_scanline < info.output_height)
@@ -374,7 +241,7 @@ struct Image
             JDIMENSION n = jpeg_read_scanlines(&info, ppBuffer, 1);
             if (n!=1) goto err;
             for(int i=0; i<info.output_width; i++)
-                Surf.get()->data[info.output_width * (info.output_scanline-1) + i] =
+                surf.data[info.output_width * (info.output_scanline-1) + i] =
                     (uint8_t)(0.299f * (float)pBuffer[i*3+0] + 0.587f * (float)pBuffer[i*3+1] + 0.114f * (float)pBuffer[i*3+2]);
         }
 
@@ -391,9 +258,9 @@ struct Image
         exit(-1);
     }
 
-    shared_ptr<Surface> GetSurface()
+    unique_ptr<Surface> GetSurface()
     {
-        return Surf;
+        return make_unique<Surface>(surf);
     }
 };
 
@@ -409,14 +276,149 @@ int main(int argc, char* argv[])
 
 #endif // platform implementation
 
-////////////////////////////
-// platform independent code
+///////////////////
+// platform independent stuff
+
+struct Surface : public surf_t
+{
+    Surface()
+    {
+        width = height = 0;
+        data = NULL;
+    }
+    Surface(const surf_t& s)
+    {
+        width = s.width; height = s.height; data = s.data;
+    }
+    Surface(const uint32_t w, const uint32_t h)
+    {
+        width = w; height = h;
+        data = new uint8_t[width * height](0);
+    }
+    virtual ~Surface()
+    {
+        if (data)
+            delete[] data;
+        data = 0;
+    }
+
+    void Realloc(const uint32_t w, const uint32_t h)
+    {
+        if (data)
+            delete[] data;
+        width = w; height = h;
+        data = new uint8_t[width * height](0);
+    }
+
+    inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }
+};
+
+struct Point : public point_t
+{
+    Point() {}
+    Point(const int _x, const int _y)
+    {
+        x = _x; y = _y;
+    }
+    Point(const point_t& p)
+    {
+        x = p.x; y = p.y;
+    }
+    virtual ~Point() {}
+
+    template< class T >
+    T Distance(const point_t& to)
+    {
+        return sqrt(T(to.x - x) * T(to.x - x) + T(to.y - y) * T(to.y - y));
+    }
+
+    // 0 is up, quantized by q
+    template< class T >
+    T Angle(const point_t& to, const T q)
+    {
+        auto fa = (atan2(to.y - y, to.x - x) + M_PI) / M_PI / 2;
+        return T(fa * q);
+    }
+};
+
+struct BBox : public bbox_t
+{
+    BBox() { xmin = xmax = ymin = ymax = 0; }
+    BBox(const int xn, const int xm, const int yn, const int ym)
+    {
+        xmin = xn; xmax = xm; ymin = yn; ymax = ym;
+    }
+    virtual ~BBox() {}
+
+    void Set(const point_t& p)
+    {
+        xmin = xmax = p.x;
+        ymin = ymax = p.y;
+    }
+
+    void Enlarge(const point_t& p)
+    {
+        xmin = min(xmin, p.x);
+        xmax = max(xmax, p.x);
+        ymin = min(ymin, p.y);
+        ymax = max(ymax, p.y);
+    }
+
+    point_t GetCenter()
+    {
+        return { (xmin + xmax) / 2, (ymin + ymax) / 2 };
+    }
+
+};
+
+// https://cppscripts.com/fft-cpp-code
+template< class T >
+void fft(vector<complex<T>>& x)
+{
+    size_t N = x.size();
+    if (N <= 1) return;
+
+    vector<complex<T>> even(N / 2), odd(N / 2);
+    for (int i = 0; i < N / 2; ++i) {
+        even[i] = x[i * 2];
+        odd[i] = x[i * 2 + 1];
+    }
+
+    fft(even);
+    fft(odd);
+
+    for (int k = 0; k < N / 2; ++k) {
+        complex<T> t = polar(1.0, -2 * M_PI * k / N) * odd[k];
+        x[k] = even[k] + t;
+        x[k + N / 2] = even[k] - t;
+    }
+}
+
+template< class T >
+void NormalizedSpectrum(std::vector<T>& s, const std::vector<T>& v)
+{
+    vector<complex<T>> x;
+    for (auto p : v)
+        x.push_back(p);
+    fft(x);
+    s.clear();
+    for (auto p : x)
+        s.push_back(norm(p));
+}
+
+// with maxing trigger
+template< class T >
+bool SelfMax(T& m, const T& v)
+{
+    if (v > m) { m = v; return true; }
+    return false;
+}
 
 void app(Image& image)
 {
     image.Load();
 
-    shared_ptr<Surface> Surf = image.GetSurface();
+    auto Surf = image.GetSurface();
 
     cout << "image width " << Surf.get()->width << " height " << Surf.get()->height << endl;
 

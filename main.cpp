@@ -430,7 +430,7 @@ void app(Image& image)
     uint8_t tune_black_tol = 128;
     uint8_t tune_adjacency_tol = 4;
     uint8_t tune_pixel_filter_tol = 25;
-    uint8_t tune_cloud_filter_factor = 10;
+    uint8_t tune_cloud_filter_factor = 0;
     uint8_t tune_box_size_tol = 25;
     uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
 
@@ -484,19 +484,25 @@ void app(Image& image)
     // perform cloud-point unifications
     // ... 
 
-    // small cloud filtering
+    // clouding / point-grouping
     std::vector< std::vector<Point> > clouds;
     clouds.resize(id);
     for (uint16_t y = 0; y < numb.height; y++)
         for (uint16_t x = 0; x < numb.width; x++)
             if(numb.At(x, y))
                 clouds[numb.At(x, y)].emplace_back(point_t({x,y}));
-    size_t maxcount = 0;
-    for (int i = 0; i < id; i++)
-        maxcount = max(maxcount,clouds[i].size());
-    for (int i = 0; i < id; i++)
-        if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
-            clouds[i].clear();
+
+    // small cloud filtering
+    // this is kind of arbitrary and perhaps should be eliminated
+    if(tune_cloud_filter_factor>0)
+    {
+        size_t maxcount = 0;
+        for (int i = 0; i < id; i++)
+            maxcount = max(maxcount,clouds[i].size());
+        for (int i = 0; i < id; i++)
+            if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
+                clouds[i].clear();
+    }
 
     // boxing and interior box removal
     std::vector<BBox> bx_limits;

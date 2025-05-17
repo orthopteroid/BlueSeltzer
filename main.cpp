@@ -12,11 +12,6 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 
-#include <memory>
-#include <iostream>
-#include <vector>
-#include <complex>
-
 #elif defined(LINUX)
 
 #include <stdio.h>
@@ -25,15 +20,19 @@
 #include <jpeglib.h>
 #include <jerror.h>
 
+#endif // platform headers
+
+///////////////////
+// common headers and basic types
+
 #include <memory>
 #include <iostream>
 #include <vector>
 #include <complex>
+#include <string>
+#include <numbers>
 
-#endif // platform headers
-
-///////////////////
-// basic types
+using namespace std;
 
 struct surf_t
 {
@@ -53,12 +52,6 @@ struct Surface;
 
 ///////////////////
 // platform dependent stuff
-
-#ifndef M_PI
-#define M_PI  3.14159265358979323846
-#endif
-
-using namespace std;
 
 #if defined(WIN32)
 
@@ -92,6 +85,20 @@ struct Image
     void SetFile(const wchar_t* wz)
     {
         wzFilename = wz;
+    }
+
+    // https://gist.github.com/xebecnan/6d070c93fb69f40c3673
+    std::string GetFile()
+    {
+        if (!wzFilename) return std::string();
+        size_t wclen = wcslen(wzFilename);
+        size_t mblen = WideCharToMultiByte(CP_UTF8, 0, wzFilename, wclen, 0, 0, NULL, NULL);
+        char* buff = new char[mblen + 1];
+        WideCharToMultiByte(CP_UTF8, 0, wzFilename, wclen, buff, mblen, NULL, NULL);
+        buff[mblen] = '\0';
+        std::string str(buff);
+        delete []buff;
+        return str;
     }
 
     void Load()
@@ -188,7 +195,7 @@ int wmain(int argc, wchar_t* argv[])
 // https://www.tspi.at/2020/03/20/libjpegexample.html#gsc.tab=0
 struct Image
 {
-    char* lpFilename;
+    char* szFilename;
     surf_t surf;
 
     Image()
@@ -200,7 +207,12 @@ struct Image
 
     void SetFile(char* sz)
     {
-        lpFilename = sz;
+        szFilename = sz;
+    }
+
+    std::string GetFile()
+    {
+        return std::string(szFilename);
     }
 
     void Load()
@@ -213,7 +225,7 @@ struct Image
         struct jpeg_error_mgr err;
 
         szContext = "fopen";
-        if ((fHandle = fopen(lpFilename, "rb")) == NULL) goto err;
+        if ((fHandle = fopen(szFilename, "rb")) == NULL) goto err;
 
         info.err = jpeg_std_error(&err);
         jpeg_create_decompress(&info);
@@ -300,14 +312,6 @@ struct Surface : public surf_t
         if (data)
             delete[] data;
         data = 0;
-    }
-
-    void Realloc(const uint32_t w, const uint32_t h)
-    {
-        if (data)
-            delete[] data;
-        width = w; height = h;
-        data = new uint8_t[width * height](0);
     }
 
     inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }
@@ -420,15 +424,16 @@ void app(Image& image)
 
     auto Surf = image.GetSurface();
 
-    cout << "image width " << Surf.get()->width << " height " << Surf.get()->height << endl;
+    cout << image.GetFile() << " width " << Surf.get()->width << " height " << Surf.get()->height << endl;
 
     // different classifications might be found by tweaking the tunings
     uint8_t tune_black_tol = 128;
     uint8_t tune_adjacency_tol = 4;
     uint8_t tune_pixel_filter_tol = 25;
-    uint8_t tune_cloud_filter_factor = 10;
+    uint8_t tune_cloud_filter_factor = 0;
     uint8_t tune_box_size_tol = 25;
     uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
+    uint8_t tune_unify_distance = 10;
 
     // edge/contrast/adjacency filter
     Surface edge(Surf.get()->width, Surf.get()->height);
@@ -450,33 +455,68 @@ void app(Image& image)
     // point numbering filter
     uint8_t id = 1; // 0 unused
     Surface numb(edge.width, edge.height);
-    for (uint16_t y = 1; y < edge.height -1; y++)
+    for (uint16_t y = 1; y < edge.height - 1; y++)
         for (uint16_t x = tune_pixel_filter_tol; x < edge.width - 2; x++)
-            if(edge.At(x,y) && !numb.At(x,y))
+            if (edge.At(x, y) && !numb.At(x, y))
             {
-                uint8_t cat = 0;
-                for(int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol && !cat; s--)
-                    if (numb.At(x - s, y - 1)) cat = numb.At(x - s, y - 1);
-                for (int s = tune_pixel_filter_tol; s > 0 && !cat; s--)
-                    if (numb.At(x - s, y)) cat = numb.At(x - s, y);
-                if (!cat)
-                    cat = id++;
-                numb.At(x, y) = cat;
+                uint8_t i = 0, neighbour = 0;
+                for (int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol; s--)
+                    if (neighbour = numb.At(x - s, y - 1))
+                        if (!i) i = neighbour;
+                for (int s = tune_pixel_filter_tol; s > 0; s--)
+                    if (neighbour = numb.At(x - s, y))
+                        if (!i) i = neighbour;
+                if (!i) i = id++;
+                numb.At(x, y) = i;
             }
 
-    // small cloud filtering
+    // clouding / point-grouping
     std::vector< std::vector<Point> > clouds;
     clouds.resize(id);
     for (uint16_t y = 0; y < numb.height; y++)
         for (uint16_t x = 0; x < numb.width; x++)
             if(numb.At(x, y))
                 clouds[numb.At(x, y)].emplace_back(point_t({x,y}));
-    size_t maxcount = 0;
-    for (int i = 0; i < id; i++)
-        maxcount = max(maxcount,clouds[i].size());
-    for (int i = 0; i < id; i++)
-        if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
-            clouds[i].clear();
+
+    // small cloud filtering
+    // this is kind of arbitrary and perhaps should be eliminated
+    if(tune_cloud_filter_factor>0)
+    {
+        size_t maxcount = 0;
+        for (int i = 0; i < id; i++)
+            maxcount = max(maxcount,clouds[i].size());
+        for (int i = 0; i < id; i++)
+            if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
+                clouds[i].clear();
+    }
+
+    // cloud unifications
+    // since the point-numbering filter is a TL-DR progressive scanner, shapes have
+    // open limbs at the top or left will receive different numberings on those limbs.
+    // the process of unification uses a pixel tolerance to join those limbs which have
+    // points that are nearby.
+    auto fnCheckOtherClouds = [&](int i, int &u)
+    {
+        for (auto ip : clouds[i])
+            for (int j = i + 1; j < id; j++) // j=i+1 for triangular
+                for (auto jp : clouds[j])
+                    if (ip.Distance<float>(jp) < (float)tune_unify_distance)
+                    {
+                        clouds[i].insert(std::end(clouds[i]), std::begin(clouds[j]), std::end(clouds[j]));
+                        clouds[j].clear();
+                        u++;
+                        return; // no need to check remaining points in j cloud
+                    }
+
+    };
+    if(tune_unify_distance>0)
+        while(true)
+        {
+            int unifications = 0;
+            for (int i = 0; i < id; i++)
+                fnCheckOtherClouds(i, unifications);
+            if(!unifications) break;
+        }
 
     // boxing and interior box removal
     std::vector<BBox> bx_limits;

@@ -31,6 +31,7 @@
 #include <complex>
 #include <string>
 #include <numbers>
+#include <algorithm>
 
 using namespace std;
 
@@ -434,6 +435,7 @@ void app(Image& image)
     uint8_t tune_box_size_tol = 25;
     uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
     uint8_t tune_unify_distance = 10;
+    uint8_t tune_radial_quant = 20;
 
     // edge/contrast/adjacency filter
     Surface edge(Surf.get()->width, Surf.get()->height);
@@ -594,7 +596,29 @@ void app(Image& image)
             NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 
+    // 0=uniform, -ve=decreasing, +ve=increasing
+    std::vector<float> radial_density_slope;
+    radial_density_slope.resize(id);
+    for (int i = 0; i < id; i++)
+        if (clouds[i].size() > 0)
+        {
+            int quants = 1;
+            std::vector<int> counts;
+            for (auto p : clouds[i])
+                quants = max<int>(quants, ceil(bx_centers[i].Distance<float>(p) / (float)tune_radial_quant));
+            counts.resize(quants);
+            for(auto p: clouds[i])
+                counts[ bx_centers[i].Distance<float>(p) / tune_radial_quant ]++;
+            std::vector<float> density;
+            density.resize(quants);
+            for(int c=0; c<quants; c++)
+                density[c] = (float)counts[c] / (float)clouds[i].size();
+            // two point line fit!
+            radial_density_slope[i] = (density[quants-1] - density[0]) / (float)quants;
+        }
+
     // print results
+    printf("object\tx\ty\tsided\tcirc\trdens\n");
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
@@ -603,12 +627,11 @@ void app(Image& image)
             for (int j = 2; j < tune_circular_frequency_bins / 2; j++) // nb start at 2 to skip VLF, end at half the F
                 if (SelfMax<double>(side_max, angl_power[i].at(j))) sides = j;
 
-            const char* sz[] = { "very likely", "possibly", "likely not" };
-            auto p = 1.0 - circ_stdev[i];
+            float circularity = 1.0 - circ_stdev[i];
 
             printf(
-                "object %d at %4d %4d has %2d sided symmetry and is %s circular\n",
-                i, bx_centers[i].x, bx_centers[i].y, sides, sz[ p > .9 ? 0 : (p > .8 ? 1 : 2) ]
+                "%d\t%d\t%d\t%d\t%4.4f\t%4.4f\n",
+                i, bx_centers[i].x, bx_centers[i].y, sides, circularity, radial_density_slope[i]
             );
         }
 }

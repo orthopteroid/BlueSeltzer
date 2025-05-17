@@ -340,7 +340,7 @@ struct Point : public point_t
     template< class T >
     T Angle(const point_t& to, const T q)
     {
-        auto fa = (atan2(to.y - y, to.x - x) + M_PI) / M_PI / 2;
+        auto fa = (atan2(to.y - y, to.x - x) + numbers::pi) / numbers::pi / 2;
         return T(fa * q);
     }
 };
@@ -392,7 +392,7 @@ void fft(vector<complex<T>>& x)
     fft(odd);
 
     for (int k = 0; k < N / 2; ++k) {
-        complex<T> t = polar(1.0, -2 * M_PI * k / N) * odd[k];
+        complex<T> t = polar(1.0, -2 * numbers::pi * k / N) * odd[k];
         x[k] = even[k] + t;
         x[k + N / 2] = even[k] - t;
     }

@@ -23,9 +23,6 @@ if (UNIX)
   target_link_libraries(${PROJECT_NAME} JPEG::JPEG)
 endif (UNIX)
 
-
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET blueseltzer PROPERTY CXX_STANDARD 20)
-endif()
+set_property(TARGET blueseltzer PROPERTY CXX_STANDARD 20)
 
 # TODO: Add tests and install targets if needed.

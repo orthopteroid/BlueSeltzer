@@ -45,6 +45,12 @@ struct point_t {
     int x, y;
 };
 
+struct unification_t
+{
+    int x, y;
+    uint8_t id;
+};
+
 struct bbox_t {
     int xmin, xmax, ymin, ymax;
 };
@@ -448,21 +454,37 @@ void app(Image& image)
         }
 
     // point numbering filter
+    std::vector<unification_t> pending_unifications;
     uint8_t id = 1; // 0 unused
     Surface numb(edge.width, edge.height);
     for (uint16_t y = 1; y < edge.height -1; y++)
         for (uint16_t x = tune_pixel_filter_tol; x < edge.width - 2; x++)
             if(edge.At(x,y) && !numb.At(x,y))
             {
-                uint8_t cat = 0;
-                for(int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol && !cat; s--)
-                    if (numb.At(x - s, y - 1)) cat = numb.At(x - s, y - 1);
-                for (int s = tune_pixel_filter_tol; s > 0 && !cat; s--)
-                    if (numb.At(x - s, y)) cat = numb.At(x - s, y);
+                uint8_t cat = 0, neighbour = 0;
+                for(int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol; s--)
+                    if (neighbour = numb.At(x - s, y - 1))
+                    {
+                        if (cat && (cat != neighbour))
+                            pending_unifications.push_back({ x - s, y - 1, cat });
+                        else
+                            cat = neighbour;
+                    }
+                for (int s = tune_pixel_filter_tol; s > 0; s--)
+                    if (neighbour = numb.At(x - s, y))
+                    {
+                        if (cat && (cat != neighbour))
+                            pending_unifications.push_back({ x - s, y, cat });
+                        else
+                            cat = neighbour;
+                    }
                 if (!cat)
                     cat = id++;
                 numb.At(x, y) = cat;
             }
+
+    // perform cloud-point unifications
+    // ... 
 
     // small cloud filtering
     std::vector< std::vector<Point> > clouds;

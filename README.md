@@ -22,37 +22,26 @@ And now for some tests!
 
 ## A Circle?
 
- ```
- c:\blueseltzer.exe circle.jpg
-  ```
 ![s](circle.jpg)
 ```
-image width 474 height 332
+circle.jpg width 474 height 332
 object 1 at  228  168 has  6 sided symmetry and is very likely circular
 ```
 
 ## A Triangle?
 
-```
-c:\blueseltzer.exe tri.jpg
-```
 ![s](tri.jpg)
 ```
-image width 474 height 332
+tri.jpg width 474 height 332
 object 1 at  260  157 has  3 sided symmetry and is likely not circular
 ```
 
 ## Shapes Everywhere!
 
-```
-c:\blueseltzer.exe circ-tri-squ-pent.jpg
-```
 ![s](circ-tri-squ-pent.jpg)
-
 ```
-image width 474 height 332
-object 1 at   73   86 has  2 sided symmetry and is likely not circular
-object 2 at  118   89 has  2 sided symmetry and is possibly circular
+circ-tri-squ-pent.jpg width 474 height 332
+object 1 at   98   86 has  5 sided symmetry and is possibly circular
 object 3 at  269   89 has  4 sided symmetry and is likely not circular
 object 4 at  411   56 has  2 sided symmetry and is very likely circular
 object 5 at  416  119 has  6 sided symmetry and is very likely circular
@@ -61,7 +50,29 @@ object 7 at  242  197 has  3 sided symmetry and is likely not circular
 object 8 at  130  252 has  5 sided symmetry and is possibly circular
 ```
 
+## Tricky shapes...
+
+These are a work in progress. The first stage has been in ensuring the point-clouds
+are unified. Later stages to the analysis might be a radial-density,
+linear-segment-length or fractal shape analysis to disambiguate stars from spirals.
+
+![s](uu.jpg)
+```
+uu.jpg width 474 height 332
+object 1 at  204  164 has  2 sided symmetry and is likely not circular
+```
+
+![s](stars.jpg)
+```
+stars.jpg width 474 height 332
+object 1 at  429   39 has  4 sided symmetry and is likely not circular
+object 2 at   43   45 has  4 sided symmetry and is likely not circular
+object 4 at  256  170 has 14 sided symmetry and is likely not circular
+object 8 at   77  257 has  5 sided symmetry and is likely not circular
+```
+
 ## Dubious References
 
 1. "Radial frequency patterns describe a small and perceptually distinct subset of all possible planar shapes" https://www.sciencedirect.com/science/article/pii/S0042698918302219
 2. "The role of local features in shape discrimination of contour- and surface-defined radial frequency patterns at low contrast" https://www.sciencedirect.com/science/article/pii/S0042698911003555
+3. "Boundaries and Coastlines: The Fractals Paradox" https://www.georgeszpiro.com/22-fractal-coastline

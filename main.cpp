@@ -433,6 +433,7 @@ void app(Image& image)
     uint8_t tune_cloud_filter_factor = 0;
     uint8_t tune_box_size_tol = 25;
     uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
+    uint8_t tune_unify_distance = 10;
 
     // edge/contrast/adjacency filter
     Surface edge(Surf.get()->width, Surf.get()->height);
@@ -452,37 +453,22 @@ void app(Image& image)
         }
 
     // point numbering filter
-    std::vector<unification_t> pending_unifications;
     uint8_t id = 1; // 0 unused
     Surface numb(edge.width, edge.height);
-    for (uint16_t y = 1; y < edge.height -1; y++)
+    for (uint16_t y = 1; y < edge.height - 1; y++)
         for (uint16_t x = tune_pixel_filter_tol; x < edge.width - 2; x++)
-            if(edge.At(x,y) && !numb.At(x,y))
+            if (edge.At(x, y) && !numb.At(x, y))
             {
-                uint8_t cat = 0, neighbour = 0;
-                for(int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol; s--)
+                uint8_t i = 0, neighbour = 0;
+                for (int s = tune_pixel_filter_tol; s > -tune_pixel_filter_tol; s--)
                     if (neighbour = numb.At(x - s, y - 1))
-                    {
-                        if (cat && (cat != neighbour))
-                            pending_unifications.push_back({ x - s, y - 1, cat });
-                        else
-                            cat = neighbour;
-                    }
+                        if (!i) i = neighbour;
                 for (int s = tune_pixel_filter_tol; s > 0; s--)
                     if (neighbour = numb.At(x - s, y))
-                    {
-                        if (cat && (cat != neighbour))
-                            pending_unifications.push_back({ x - s, y, cat });
-                        else
-                            cat = neighbour;
-                    }
-                if (!cat)
-                    cat = id++;
-                numb.At(x, y) = cat;
+                        if (!i) i = neighbour;
+                if (!i) i = id++;
+                numb.At(x, y) = i;
             }
-
-    // perform cloud-point unifications
-    // ... 
 
     // clouding / point-grouping
     std::vector< std::vector<Point> > clouds;
@@ -503,6 +489,34 @@ void app(Image& image)
             if(clouds[i].size() < max(static_cast<size_t>(10), maxcount / tune_cloud_filter_factor))
                 clouds[i].clear();
     }
+
+    // cloud unifications
+    // since the point-numbering filter is a TL-DR progressive scanner, shapes have
+    // open limbs at the top or left will receive different numberings on those limbs.
+    // the process of unification uses a pixel tolerance to join those limbs which have
+    // points that are nearby.
+    auto fnCheckOtherClouds = [&](int i, int &u)
+    {
+        for (auto ip : clouds[i])
+            for (int j = i + 1; j < id; j++) // j=i+1 for triangular
+                for (auto jp : clouds[j])
+                    if (ip.Distance<float>(jp) < (float)tune_unify_distance)
+                    {
+                        clouds[i].insert(std::end(clouds[i]), std::begin(clouds[j]), std::end(clouds[j]));
+                        clouds[j].clear();
+                        u++;
+                        return; // no need to check remaining points in j cloud
+                    }
+
+    };
+    if(tune_unify_distance>0)
+        while(true)
+        {
+            int unifications = 0;
+            for (int i = 0; i < id; i++)
+                fnCheckOtherClouds(i, unifications);
+            if(!unifications) break;
+        }
 
     // boxing and interior box removal
     std::vector<BBox> bx_limits;

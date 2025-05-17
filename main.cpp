@@ -12,11 +12,6 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 
-#include <memory>
-#include <iostream>
-#include <vector>
-#include <complex>
-
 #elif defined(LINUX)
 
 #include <stdio.h>
@@ -25,15 +20,19 @@
 #include <jpeglib.h>
 #include <jerror.h>
 
+#endif // platform headers
+
+///////////////////
+// common headers and basic types
+
 #include <memory>
 #include <iostream>
 #include <vector>
 #include <complex>
+#include <string>
+#include <numbers>
 
-#endif // platform headers
-
-///////////////////
-// basic types
+using namespace std;
 
 struct surf_t
 {
@@ -45,12 +44,6 @@ struct point_t {
     int x, y;
 };
 
-struct unification_t
-{
-    int x, y;
-    uint8_t id;
-};
-
 struct bbox_t {
     int xmin, xmax, ymin, ymax;
 };
@@ -59,12 +52,6 @@ struct Surface;
 
 ///////////////////
 // platform dependent stuff
-
-#ifndef M_PI
-#define M_PI  3.14159265358979323846
-#endif
-
-using namespace std;
 
 #if defined(WIN32)
 
@@ -306,14 +293,6 @@ struct Surface : public surf_t
         if (data)
             delete[] data;
         data = 0;
-    }
-
-    void Realloc(const uint32_t w, const uint32_t h)
-    {
-        if (data)
-            delete[] data;
-        width = w; height = h;
-        data = new uint8_t[width * height](0);
     }
 
     inline uint8_t& At(const int x, const int y) { return data[x + y * width]; }

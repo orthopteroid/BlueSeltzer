@@ -33,7 +33,8 @@ And now for some tests!
 ```
 circle.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       228     168     6       0.9267  0.2000
+1       228     168     6       0.9267  1.0000
+
 ```
 
 ## A Triangle?
@@ -42,7 +43,8 @@ object  x       y       sided   circ    rdens
 ```
 tri.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       260     157     3       0.5046  0.0041
+1       260     157     3       0.5046  0.0290
+
 ```
 
 ## Shapes Everywhere!
@@ -53,13 +55,13 @@ It looks like object 2 isn't recognized. I'm not sure what is happening there...
 ```
 circ-tri-squ-pent.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       98      86      5       0.8307  0.0135
-3       269     89      4       0.7926  0.0259
-4       411     56      2       0.9009  -0.4887
+1       98      86      5       0.8307  0.0674
+3       269     89      4       0.7926  0.1294
+4       411     56      2       0.9009  -0.9774
 5       416     119     6       0.9279  0.0000
-6       358     234     3       0.5628  0.0042
-7       242     197     3       0.7683  -0.1654
-8       130     252     5       0.8619  0.0060
+6       358     234     3       0.5628  0.0249
+7       242     197     3       0.7683  -0.3309
+8       130     252     5       0.8619  0.0238
 ```
 
 ## Tricky shapes...
@@ -72,24 +74,24 @@ linear-segment-length or fractal shape analysis to disambiguate stars from spira
 ```
 uu.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       204     164     2       0.2879  0.0003
+1       204     164     2       0.2879  0.0028
 ```
 
 ![s](stars.jpg)
 ```
 stars.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       429     39      4       0.6746  -0.3205
-2       43      45      4       0.6660  -0.3013
-4       256     170     14      0.4523  -0.0188
-8       77      257     5       0.6897  -0.0499
+1       429     39      4       0.6746  -0.6409
+2       43      45      4       0.6660  -0.6027
+4       256     170     14      0.4523  -0.1504
+8       77      257     5       0.6897  -0.0998
 ```
 
 ![s](spiral.jpg)
 ```
 spiral.jpg width 474 height 332
 object  x       y       sided   circ    rdens
-1       212     160     2       0.6050  0.0053
+1       212     160     2       0.6050  0.0368
 ```
 
 ## Dubious References

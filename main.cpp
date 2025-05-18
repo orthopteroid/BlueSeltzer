@@ -613,8 +613,9 @@ void app(Image& image)
             density.resize(quants);
             for(int c=0; c<quants; c++)
                 density[c] = (float)counts[c] / (float)clouds[i].size();
-            // two point line fit!
-            radial_density_slope[i] = (density[quants-1] - density[0]) / (float)quants;
+            // don't actually divide by quants, because we want this 'slope' to
+            // be dimensionless (ie size invariant)
+            radial_density_slope[i] = (density[quants-1] - density[0]);
         }
 
     // print results

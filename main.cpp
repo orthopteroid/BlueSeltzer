@@ -433,9 +433,9 @@ void app(Image& image)
     uint8_t tune_pixel_filter_tol = 25;
     uint8_t tune_cloud_filter_factor = 0;
     uint8_t tune_box_size_tol = 25;
-    uint8_t tune_circular_frequency_bins = 32; // must be a power of 2
+    uint8_t tune_angular_bins = 32; // must be a power of 2
     uint8_t tune_unify_distance = 10;
-    uint8_t tune_radial_quant = 20;
+    uint8_t tune_radial_bins = 32; // must be a power of 2
 
     // edge/contrast/adjacency filter
     Surface edge(Surf.get()->width, Surf.get()->height);
@@ -566,33 +566,34 @@ void app(Image& image)
             circ_stdev[i] = pow(circ_stdev[i], 0.5) / clouds[i].size();
         }
 
-    // angular frequency / power filtering
+    // angular power spectrum
     std::vector< std::vector<double> > angl_power;
     angl_power.resize(id);
+    std::vector< std::vector<int> > angl_count;
+    angl_count.resize(id);
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
-            std::vector<double> angl_count;
-            angl_count.resize(tune_circular_frequency_bins);
+            angl_count[i].resize(tune_angular_bins);
             for (point_t p : clouds[i])
-                angl_count.at(bx_centers[i].Angle(p, tune_circular_frequency_bins-1)) += 1;
+                angl_count[i].at(bx_centers[i].Angle(p, tune_angular_bins - 1)) += 1;
 
             std::vector<double> angl_norm_factor;
-            angl_norm_factor.resize(tune_circular_frequency_bins);
-            for (int j = 0; j < tune_circular_frequency_bins; j++)
-                angl_norm_factor.at(j) = angl_count.at(j) / clouds[i].size();
+            angl_norm_factor.resize(tune_angular_bins);
+            for (int a = 0; a < tune_angular_bins; a++)
+                angl_norm_factor.at(a) = angl_count[i].at(a) / clouds[i].size();
 
             std::vector<double> angl_excursion;
-            angl_excursion.resize(tune_circular_frequency_bins);
+            angl_excursion.resize(tune_angular_bins);
             for (Point p : clouds[i])
-                SelfMax<double>(angl_excursion.at(bx_centers[i].Angle(p, tune_circular_frequency_bins-1)), p.Distance<double>(bx_centers[i]));
+                SelfMax<double>(angl_excursion.at(bx_centers[i].Angle(p, tune_angular_bins - 1)), p.Distance<double>(bx_centers[i]));
 
             std::vector<double> angl_excursion_factor;
-            angl_excursion_factor.resize(tune_circular_frequency_bins);
-            for (int j = 0; j < tune_circular_frequency_bins; j++)
-                angl_excursion_factor.at(j) = angl_norm_factor.at(j) * (angl_excursion.at(j) / circ_radius[i]);
+            angl_excursion_factor.resize(tune_angular_bins);
+            for (int a = 0; a < tune_angular_bins; a++)
+                angl_excursion_factor.at(a) = angl_norm_factor.at(a) * (angl_excursion.at(a) / circ_radius[i]);
 
-            angl_power.resize(tune_circular_frequency_bins);
+            angl_power.resize(tune_angular_bins);
             NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 
@@ -602,20 +603,20 @@ void app(Image& image)
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
-            int quants = 1;
-            std::vector<int> counts;
+            int bins = 1;
+            std::vector<int> count;
             for (auto p : clouds[i])
-                quants = max<int>(quants, ceil(bx_centers[i].Distance<float>(p) / (float)tune_radial_quant));
-            counts.resize(quants);
+                bins = max<int>(bins, ceil(bx_centers[i].Distance<float>(p) / (float)tune_radial_bins));
+            count.resize(bins);
             for(auto p: clouds[i])
-                counts[ bx_centers[i].Distance<float>(p) / tune_radial_quant ]++;
+                count[ bx_centers[i].Distance<float>(p) / tune_radial_bins ]++;
             std::vector<float> density;
-            density.resize(quants);
-            for(int c=0; c<quants; c++)
-                density[c] = (float)counts[c] / (float)clouds[i].size();
-            // don't actually divide by quants, because we want this 'slope' to
+            density.resize(bins);
+            for(int c=0; c<bins; c++)
+                density[c] = (float)count[c] / (float)clouds[i].size();
+            // don't actually divide by bins, because we want this 'slope' to
             // be dimensionless (ie size invariant)
-            radial_density_slope[i] = (density[quants-1] - density[0]);
+            radial_density_slope[i] = (density[bins-1] - density[0]);
         }
 
     // print results
@@ -623,16 +624,16 @@ void app(Image& image)
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
-            int sides = 0;
-            double side_max = 0;
-            for (int j = 2; j < tune_circular_frequency_bins / 2; j++) // nb start at 2 to skip VLF, end at half the F
-                if (SelfMax<double>(side_max, angl_power[i].at(j))) sides = j;
+            int angl_freq = 0;
+            double angl_freq_max = 0;
+            for (int a = 2; a < tune_angular_bins / 2; a++) // nb start at 2 to skip VLF, end at half the F
+                if (SelfMax<double>(angl_freq_max, angl_power[i].at(a))) angl_freq = a;
 
             float circularity = 1.0 - circ_stdev[i];
 
             printf(
                 "%d\t%d\t%d\t%d\t%4.4f\t%4.4f\n",
-                i, bx_centers[i].x, bx_centers[i].y, sides, circularity, radial_density_slope[i]
+                i, bx_centers[i].x, bx_centers[i].y, angl_freq, circularity, radial_density_slope[i]
             );
         }
 }

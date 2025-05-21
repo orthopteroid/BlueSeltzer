@@ -569,7 +569,7 @@ void app(Image& image)
     // angular power spectrum
     std::vector< std::vector<double> > angl_power;
     angl_power.resize(id);
-    std::vector< std::vector<int> > angl_count;
+    std::vector< std::vector<double> > angl_count;
     angl_count.resize(id);
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
@@ -591,29 +591,29 @@ void app(Image& image)
             std::vector<double> angl_excursion_factor;
             angl_excursion_factor.resize(tune_angular_bins);
             for (int a = 0; a < tune_angular_bins; a++)
-                angl_excursion_factor.at(a) = angl_norm_factor.at(a) * (angl_excursion.at(a) / circ_radius[i]);
+                angl_excursion_factor[a] = angl_norm_factor.at(a) * (angl_excursion.at(a) / circ_radius[i]);
 
             angl_power[i].resize(tune_angular_bins);
             NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 
     // 0=uniform, -ve=decreasing, +ve=increasing
-    std::vector<float> radial_density_slope;
+    std::vector<double> radial_density_slope;
     radial_density_slope.resize(id);
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
             int bins = 1;
-            std::vector<int> count;
+            std::vector<double> count;
             for (auto p : clouds[i])
-                bins = max<int>(bins, ceil(bx_centers[i].Distance<float>(p) / (float)tune_radial_bins));
+                bins = max<int>(bins, ceil(bx_centers[i].Distance<double>(p) / (double)tune_radial_bins));
             count.resize(bins);
             for(auto p: clouds[i])
-                count[ bx_centers[i].Distance<float>(p) / tune_radial_bins ]++;
-            std::vector<float> density;
+                count[ bx_centers[i].Distance<double>(p) / tune_radial_bins ] += 1;
+            std::vector<double> density;
             density.resize(bins);
             for(int c=0; c<bins; c++)
-                density[c] = (float)count[c] / (float)clouds[i].size();
+                density[c] = count[c] / (double)clouds[i].size();
             // don't actually divide by bins, because we want this 'slope' to
             // be dimensionless (ie size invariant)
             radial_density_slope[i] = (density[bins-1] - density[0]);

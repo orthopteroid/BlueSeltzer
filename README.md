@@ -34,54 +34,65 @@ and the size of the object under analysis, so there should be some tuning here p
 patterns that are strongly radially periodic and radially symmetrical the stdev coefficient
 should likely be below 1 and hopefully close to 0.
 
-And now for some tests!
+# Tests on some freehand shapes
 
-## A Circle?
+For better or worse with the default settings!
 
-![s](circle.jpg)
+![s](circles.jpg)
 ```
-circle.jpg width 474 height 332
+circles.jpg width 474 height 332
 object  x       y       sided   circ    rdens   rfavg   rfdev
-1       228     168     6       0.927   +0.060  2.000   1.925
+1       54      52      2       0.887   -0.976  2.000   2.072
+2       391     68      2       0.883   +0.000  2.000   2.121
+3       228     168     6       0.927   +0.060  2.000   1.925
+4       59      191     2       0.829   +0.182  2.875   1.773
 ```
 
-## A Triangle?
-
-![s](tri.jpg)
+![s](tris.jpg)
 ```
-tri.jpg width 474 height 332
+tris.jpg width 474 height 332
 object  x       y       sided   circ    rdens   rfavg   rfdev
-1       260     157     3       0.505   +0.270  3.062   1.708
+1       56      53      3       0.711   +0.000  2.000   2.121
+2       444     51      0       1.000   +0.000  0.062   -nan(ind)
+3       382     52      4       0.646   +0.000  0.062   -nan(ind)
+4       260     157     3       0.505   +0.270  3.062   1.708
+5       67      127     3       0.745   +0.000  2.000   2.121
+6       444     155     15      0.811   +0.000  0.375   -nan(ind)
+7       389     198     4       0.728   +0.000  0.188   -nan(ind)
+8       76      219     0       1.000   +0.000  0.062   -nan(ind)
+9       387     255     4       1.000   +0.000  0.125   -nan(ind)
+11      119     258     4       0.646   +0.000  0.062   -nan(ind)
+12      48      266     0       1.000   +0.000  0.062   -nan(ind)
+13      261     266     0       1.000   +0.000  0.062   -nan(ind)
+14      202     267     0       1.000   +0.000  0.062   -nan(ind)
+15      452     285     2       0.597   +0.000  0.250   -nan(ind)
+16      364     299     0       1.000   +0.000  0.062   -nan(ind)
+17      207     307     0       1.000   +0.000  0.062   -nan(ind)
 ```
 
-## Shapes Everywhere!
-
-It looks like object 2 isn't recognized. I'm not sure what is happening there...
-
-![s](circ-tri-squ-pent.jpg)
+![s](squares.jpg)
 ```
-circ-tri-squ-pent.jpg width 474 height 332
+squares.jpg width 474 height 332
 object  x       y       sided   circ    rdens   rfavg   rfdev
-1       98      86      5       0.831   +0.003  2.438   1.830
-3       269     89      4       0.793   +0.676  2.625   1.876
-4       411     56      2       0.901   +0.000  2.000   2.121
-5       416     119     6       0.928   +0.000  2.000   2.121
-6       358     234     3       0.563   +0.058  3.000   1.655
-7       242     197     3       0.768   +0.000  2.000   2.121
-8       130     252     5       0.862   +1.000  4.000   1.768
+1       364     30      4       0.850   +0.000  2.000   2.121
+2       210     36      4       0.840   +0.000  1.938   -nan(ind)
+4       51      73      0       1.000   +0.000  0.062   -nan(ind)
+5       202     155     4       0.744   +0.644  3.000   1.825
+6       376     138     4       0.864   -0.992  2.000   2.110
+7       380     247     4       0.827   +0.278  2.812   1.711
+8       214     275     4       0.845   +0.000  2.000   2.121
+9       67      306     0       1.000   +0.000  0.062   -nan(ind)
 ```
 
-## Tricky shapes...
-
-These are a work in progress. The first stage has been in ensuring the point-clouds
-are unified. Later stages to the analysis might be a radial-density,
-linear-segment-length or fractal shape analysis to disambiguate stars from spirals.
-
-![s](uu.jpg)
+![s](hexagons.jpg)
 ```
-uu.jpg width 474 height 332
+hexagons.jpg width 474 height 332
 object  x       y       sided   circ    rdens   rfavg   rfdev
-1       204     164     2       0.288   +0.039  3.469   -nan(ind)
+1       353     31      5       0.557   +0.000  0.250   -nan(ind)
+2       231     169     5       0.814   +0.274  2.188   1.875
+3       73      127     0       1.000   +0.000  0.062   -nan(ind)
+4       407     231     2       0.752   +0.247  2.562   1.721
+5       74      249     4       0.740   +0.520  3.125   1.754
 ```
 
 ![s](stars.jpg)
@@ -94,15 +105,19 @@ object  x       y       sided   circ    rdens   rfavg   rfdev
 8       77      257     5       0.690   -0.840  1.750   -nan(ind)
 ```
 
-![s](spiral.jpg)
-
-For the sprial, the radial frequency deviation is below 1. This is probably indicating
-a consistient radial frequency.
-
+![s](spirals.jpg)
 ```
-spiral.jpg width 474 height 332
+spirals.jpg width 474 height 332
 object  x       y       sided   circ    rdens   rfavg   rfdev
-1       212     160     2       0.605   -0.083  2.000   0.445
+1       35      39      2       0.662   +0.000  1.812   -nan(ind)
+2       391     58      2       0.700   -0.624  2.000   1.791
+4       212     160     2       0.605   -0.083  2.000   0.445
+5       40      108     2       0.601   +0.000  1.750   -nan(ind)
+7       413     147     2       0.731   -0.694  2.000   1.839
+10      37      188     2       0.595   +0.000  1.250   -nan(ind)
+11      46      222     2       0.688   +0.000  2.000   2.121
+12      365     267     2       0.596   -0.244  1.375   -nan(ind)
+13      100     280     2       0.627   -0.935  2.000   2.004
 ```
 
 ## Dubious References

@@ -593,7 +593,7 @@ void app(Image& image)
             for (int a = 0; a < tune_angular_bins; a++)
                 angl_excursion_factor.at(a) = angl_norm_factor.at(a) * (angl_excursion.at(a) / circ_radius[i]);
 
-            angl_power.resize(tune_angular_bins);
+            angl_power[i].resize(tune_angular_bins);
             NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 

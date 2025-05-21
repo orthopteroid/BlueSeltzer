@@ -597,6 +597,68 @@ void app(Image& image)
             NormalizedSpectrum(angl_power[i], angl_excursion_factor);
         }
 
+    // radial power spectrum for each angle
+    std::vector< std::vector< std::vector<double> > > radial_power;
+    radial_power.resize(id);
+    for (int i = 0; i < id; i++)
+        if (clouds[i].size() > 0)
+        {
+            radial_power[i].resize(tune_angular_bins);
+
+            std::vector< std::vector<double> > radial_count;
+            radial_count.resize(tune_angular_bins);
+            for (int a = 0; a < tune_angular_bins; a++)
+                radial_count[a].resize(tune_radial_bins);
+
+            // dart-board like structure for each cloud to count points
+            for (point_t p : clouds[i])
+            {
+                auto r = bx_centers[i].Distance<double>(p) / tune_radial_bins;
+                auto a = bx_centers[i].Angle(p, tune_angular_bins - 1);
+                radial_count[a].at(r) += 1;
+            }
+
+            for (int a=0; a < tune_angular_bins; a++)
+            {
+                std::vector<double> radial_weight_factor;
+                radial_weight_factor.resize(tune_radial_bins);
+                for (int r = 0; r < tune_radial_bins; r++)
+                    radial_weight_factor.at(r) = radial_count[a].at(r) / angl_count[i].at(a);
+
+                radial_power[i].at(a).resize(tune_angular_bins);
+                NormalizedSpectrum(radial_power[i].at(a), radial_weight_factor);
+            }
+        }
+    std::vector<double> radial_freq_avg;
+    radial_freq_avg.resize(id);
+    std::vector<double> radial_freq_stdev;
+    radial_freq_stdev.resize(id);
+    for (int i = 0; i < id; i++)
+        if (clouds[i].size() > 0)
+        {
+            double angl_freq_avg = 0;
+            std::vector<double> rad_freq;
+            rad_freq.resize(tune_angular_bins);
+            for (int a = 0; a < tune_angular_bins; a++)
+            {
+                double rad_freq_max = 0;
+                for (int r = 2; r < tune_radial_bins / 2; r++) // nb start at 2 to skip VLF, end at half the F
+                {
+                    if (SelfMax<double>(rad_freq_max, radial_power[i].at(a).at(r))) rad_freq[a] = r;
+                    angl_freq_avg += radial_power[i].at(a).at(r);
+                }
+            }
+            angl_freq_avg /= tune_angular_bins;
+
+            for (int a = 0; a < tune_angular_bins; a++)
+                radial_freq_avg[i] += rad_freq[a];
+            radial_freq_avg[i] /= tune_angular_bins;
+
+            for (int a = 0; a < tune_angular_bins; a++)
+                radial_freq_stdev[i] += pow(angl_freq_avg - radial_freq_avg[i], 2);
+            radial_freq_stdev[i] = pow(radial_freq_stdev[i], 0.5) / tune_angular_bins;
+        }
+
     // 0=uniform, -ve=decreasing, +ve=increasing
     std::vector<double> radial_density_slope;
     radial_density_slope.resize(id);
@@ -620,7 +682,7 @@ void app(Image& image)
         }
 
     // print results
-    printf("object\tx\ty\tsided\tcirc\trdens\n");
+    printf("object\tx\ty\tsided\tcirc\trdens\trfavg\trfdev\n");
     for (int i = 0; i < id; i++)
         if (clouds[i].size() > 0)
         {
@@ -632,8 +694,9 @@ void app(Image& image)
             float circularity = 1.0 - circ_stdev[i];
 
             printf(
-                "%d\t%d\t%d\t%d\t%4.4f\t%4.4f\n",
-                i, bx_centers[i].x, bx_centers[i].y, angl_freq, circularity, radial_density_slope[i]
+                "%d\t%d\t%d\t%d\t%4.3f\t%+4.3f\t%4.3f\t%4.3f\n",
+                i, bx_centers[i].x, bx_centers[i].y, angl_freq, circularity,
+                radial_density_slope[i], radial_freq_avg[i], radial_freq_stdev[i]
             );
         }
 }

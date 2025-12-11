@@ -419,6 +419,13 @@ bool SelfMax(T& m, const T& v)
     return false;
 }
 
+template< class T >
+T SafeNZDiv(const T& n, const T& d, size_t& nz_divisions)
+{
+    if (fabs(d) > 1e-8) { return n / d; nz_divisions++; }
+    return 0;
+}
+
 void app(Image& image)
 {
     image.Load();
@@ -620,10 +627,11 @@ void app(Image& image)
 
             for (int a=0; a < tune_angular_bins; a++)
             {
+                size_t nz_count = 0;
                 std::vector<double> radial_weight_factor;
                 radial_weight_factor.resize(tune_radial_bins);
                 for (int r = 0; r < tune_radial_bins; r++)
-                    radial_weight_factor.at(r) = radial_count[a].at(r) / angl_count[i].at(a);
+                    radial_weight_factor.at(r) = SafeNZDiv(radial_count[a].at(r), angl_count[i].at(a), nz_count);
 
                 radial_power[i].at(a).resize(tune_angular_bins);
                 NormalizedSpectrum(radial_power[i].at(a), radial_weight_factor);
